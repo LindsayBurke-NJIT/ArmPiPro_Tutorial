@@ -1,0 +1,25 @@
+This git repository features code libraries and tutorials for the Hiwonder Arm Pi Pro. Initially it utilized ROS, but the robot itself isn't robust enough to properly utilize it, so the code was abstracted.
+
+The current libraries created are MecanumChasis and Lidar. 
+
+## MecanumChasis Library
+
+The MecanumChasis Library focuses on the motor drive control of the Arm Pi Pro robot. Below lists the functions in the library and how to utilize them. 
+The special thing about the Arm Pi Pro is that it utilizes mecanum wheels, meaning that the robot can strafe. Strafing means the robot keeps the same oreintation while being able to move in different directions.
+A key note about mecanum wheels is that you want to make sure they operate in a smooth enivronment as the design of the wheels can easily get jammed due to debris.
+Below are the functions provided in the library. Proper manipulation of the arguments/parameters in the functions are necessary to acchieve specific robot movements.
+
+```
+set_motor_speeds(self, speeds)
+# Self refers to the object itself, the editable parameter/argument in the speeds.
+# Speed ranges from -100 to 100, determines how fast the wheels move and the robot's direction
+
+stop_motors(self)
+# Stops the motors, setting them to zero
+
+drive(self, speed=100, angle=0, duration=2)
+# Makes the robot drive, and has three parameters: speed, angle and duration.
+# Speed determines the speed of the motors and the direction they spin (in mm/s).
+# Angle plays into the strafeing aspect, can make the robot move diagonally (in degrees).
+# Duration is how long the robot moves (seconds).
+```
