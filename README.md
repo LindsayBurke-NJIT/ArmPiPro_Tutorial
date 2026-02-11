@@ -30,9 +30,9 @@ drive(self, speed=100, angle=0, duration=2)
 
 ### Recommended Practice Problems for MecanumChasis Library
 
-## Lidar
+## Lidar Library
 
-To implement more robust autonomous navigation onto the robot, a LIDAR will be used. A LIDAR works similar to a ultrasonic sensor, but utilizes optics principles instead of sound.
+To implement more robust autonomous navigation onto the robot, a LIDAR will be used.
 A LiDAR(Light Detection and Ranging) is a specialized sensor that uses light in the form of pulsed lasers to measure distances. Most LiDARs have a built-in IMU to calculate distance traveled and depth.
 Using this data, it can accurately create a 3D map of its surroundings. 
 These sensors feature a rotating motor inside, enabling them to capture a 360-degree view of their surroundings. 
@@ -40,5 +40,8 @@ Functionally, you can think of it as a Hypersonic sensor; conceptually, though, 
 
 The LiDAR that is used for this robot is the Hokuyo UST-10LX. It utilizes two cables, one for power and one for communication. 
 Since the LiDAR requires more voltage than the Raspberry Pi can provide, it is connected to an external Lithium Ion battery pack to supply the power.
-It also has a python library, which is heavily used in the code.
+It also has a python library, which has been adapted for the code library used for this robot.
 
+The main motivation for implementing a LiDAR is for SLAM (Simultaneous Localization and Mapping) methodology. 
+This allows the robot to create a 3D map using the LiDAR data and localize itself on the map at the same time. 
+Essentially, the LiDAR serves as the robot's eyes, enabling it to navigate through various terrains by using data about its surroundings.
