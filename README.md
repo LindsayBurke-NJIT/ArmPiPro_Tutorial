@@ -1,3 +1,5 @@
+# Introduction
+
 Contributors: Lindsay Burke, Johnnuel Magno
 
 For use at NJIT's Robotics Class
