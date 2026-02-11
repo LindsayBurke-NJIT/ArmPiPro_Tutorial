@@ -2,6 +2,7 @@
 # coding=utf8
 import time
 import smbus2
+import math
 
 # Motor controller I2C address
 ENCODER_MOTOR_MODULE_ADDRESS = 0x34
@@ -55,12 +56,44 @@ class MecanumChassis:
             print("Stopping...")
             self.stop_motors()
 
+    def drive(self, speed=100, angle=0, duration=2):
+        """Drive the robot forward
+        Args:
+            speed (int): Speed in range -100 to 100 mm/s (default 60)
+            angle (int): Angle at which to drive the robot (0 to 359 -> 0 is right, 180 is back, 270 is left)
+            duration (int): How long to drive in seconds (default 2)
+        """
+        if not -100 <= speed <= 100:
+            raise ValueError("Speed must be between -100 and 100")
+        radians = angle*(math.pi/180.)
+
+        frontLeftSpeed = int(math.cos(radians)*speed+math.sin(radians)*speed)
+        frontRightSpeed = int(-1*math.cos(radians)*speed+math.sin(radians)*speed)
+        backLeftSpeed = int(-1*math.cos(radians)*speed+math.sin(radians)*speed)
+        backRightSpeed = int(math.cos(radians)*speed + math.sin(radians)*speed)
+        speeds = [frontLeftSpeed, frontRightSpeed, backLeftSpeed, backRightSpeed]
+        
+        try:
+            print(f"Driving on {angle} degree angle at speed {speed} for {duration} seconds...")
+            self.set_motor_speeds(speeds)
+            time.sleep(duration)
+        finally:
+            print("Stopping...")
+            self.stop_motors()
+    
+    def move_servo(self, servo_id, angle):
+        import serial
+        ser = serial.Serial('/dev/ttyAMA0', 10000, timeout=1)
+        if 0<=angle<=180:
+            data_packet = bytes([255, servo_id, angle])
+            ser.write(data_packet)
+
 def main():
     i2cPort = 1
     chassis = MecanumChassis()
     try:
         # Drive forward at 60mm/s for 2 seconds
-        chassis.drive_forward(60, 2)
+        chassis.drive(60, 90, 2)
     except KeyboardInterrupt:
         print("\nStopping due to keyboard interrupt...")
     finally:
