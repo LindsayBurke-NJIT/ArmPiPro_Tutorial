@@ -1,4 +1,5 @@
 Contributors: Lindsay Burke, Johnnuel Magno
+
 For use at NJIT's Robotics Class
 
 This git repository features code libraries and tutorials for the Hiwonder Arm Pi Pro. Initially it utilized ROS, but the robot itself isn't robust enough to properly utilize it, so the code was abstracted.
