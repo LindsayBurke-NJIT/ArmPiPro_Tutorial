@@ -1,4 +1,5 @@
 Contributors: Lindsay Burke, Johnnuel Magno
+For use at NJIT's Robotics Class
 
 This git repository features code libraries and tutorials for the Hiwonder Arm Pi Pro. Initially it utilized ROS, but the robot itself isn't robust enough to properly utilize it, so the code was abstracted.
 
@@ -7,7 +8,10 @@ The current libraries created are MecanumChasis and Lidar.
 ## MecanumChasis Library
 
 The MecanumChasis Library focuses on the motor drive control of the Arm Pi Pro robot. Below lists the functions in the library and how to utilize them. 
-The special thing about the Arm Pi Pro is that it utilizes mecanum wheels, meaning that the robot can strafe. Strafing means the robot keeps the same oreintation while being able to move in different directions.
+The special thing about the Arm Pi Pro is that it utilizes mecanum wheels, meaning that the robot can strafe. 
+Strafing means the robot keeps the same oreintation while being able to move in different directions. 
+This makes it perfect for applications where tight turns cannot easily be made, such as in warehouses.
+
 A key note about mecanum wheels is that you want to make sure they operate in a smooth enivronment as the design of the wheels can easily get jammed due to debris.
 Below are the functions provided in the library. Proper manipulation of the arguments/parameters in the functions are necessary to acchieve specific robot movements.
 
