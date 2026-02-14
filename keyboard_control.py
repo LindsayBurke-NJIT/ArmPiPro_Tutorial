@@ -19,6 +19,10 @@ from direct_drive import MecanumChassis
 DRIVE_SPEED = 60
 TURN_SPEED = 50
 KEY_TIMEOUT = 0.15  # Consider key "released" if not seen for this long (terminal repeats when held)
+# Invert if directions are wrong (robot orientation/motor wiring varies)
+INVERT_FORWARD = False
+INVERT_STRAFE = False
+INVERT_ROTATION = False
 
 
 def main():
@@ -60,6 +64,13 @@ def main():
         if is_pressed(KEY_RIGHT):
             rotation += TURN_SPEED
 
+        if INVERT_FORWARD:
+            forward = -forward
+        if INVERT_STRAFE:
+            strafe = -strafe
+        if INVERT_ROTATION:
+            rotation = -rotation
+
         chassis.drive_xy(forward=forward, strafe=strafe, rotation=rotation)
 
     def read_key():
@@ -68,17 +79,21 @@ def main():
             return None
         ch = sys.stdin.read(1)
         if ch == '\x1b':
-            if select.select([sys.stdin], [], [], 0.02)[0]:
+            # Arrow keys send \x1b[A etc - use longer timeout for SSH latency
+            if select.select([sys.stdin], [], [], 0.1)[0]:
                 ch2 = sys.stdin.read(1)
-                if ch2 == '[' and select.select([sys.stdin], [], [], 0.02)[0]:
+                if ch2 == '[' and select.select([sys.stdin], [], [], 0.1)[0]:
                     ch3 = sys.stdin.read(1)
                     return ch + ch2 + ch3  # e.g. \x1b[A
+            return ch  # Plain Escape (no follow-up bytes)
         return ch.lower() if ch.isalpha() else ch
 
     print("Keyboard control active (terminal/SSH mode).")
     print("  WASD = drive/strafe (W+D = diagonal, etc.)")
     print("  Arrow keys = zero-point turn")
     print("  Esc or Ctrl+C = quit")
+    if any((INVERT_FORWARD, INVERT_STRAFE, INVERT_ROTATION)):
+        print("  (Axis inversion active - edit INVERT_* constants if directions wrong)")
     print()
 
     try:
