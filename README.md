@@ -40,8 +40,8 @@ drive_xy(self, forward=0, strafe=0, rotation=0, base_speed=60)
 ### Keyboard Control
 
 Run `python keyboard_control.py` to drive the robot with:
-- **WASD**: Move and strafe (W+D = diagonal, etc.)
-- **Arrow keys**: Zero-point turn
+- **WASD**: Move and strafe (W=forward, A=left, S=back, D=right)
+- **Q/E**: Zero-point turn (Q=left, E=right)
 - **Esc** or **Ctrl+C**: Stop and exit
 
 Works over SSH (reads from terminal stdin).
