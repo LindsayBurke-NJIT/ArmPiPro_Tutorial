@@ -52,7 +52,7 @@ Requires `pynput`: `pip install pynput`
 
 ## Lidar Library
 
-To implement more robust autonomous navigation onto the robot, a LIDAR will be used.
+To implement more robust autonomous navigation onto the robot, a LiDAR will be used.
 A LiDAR(Light Detection and Ranging) is a specialized sensor that uses light in the form of pulsed lasers to measure distances. Most LiDARs have a built-in IMU to calculate distance traveled and depth.
 Using this data, it can accurately create a 3D map of its surroundings. 
 These sensors feature a rotating motor inside, enabling them to capture a 360-degree view of their surroundings. 
