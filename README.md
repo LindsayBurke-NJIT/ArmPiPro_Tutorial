@@ -33,18 +33,18 @@ drive(self, speed=100, angle=0, duration=2)
 # Duration is how long the robot moves (seconds).
 
 drive_xy(self, forward=0, strafe=0, rotation=0, base_speed=60)
-# Continuous drive for keyboard/joystick control. Combine forward, strafe, and rotation.
+# Continuous drive for keyboard/joystick control.
 # Use with keyboard_control.py for WASD + arrow key teleop.
 ```
 
 ### Keyboard Control
 
 Run `python keyboard_control.py` to drive the robot with:
-- **WASD**: Move and strafe (e.g. W+D = diagonal forward-right)
-- **Arrow keys**: Zero-point turn (rotate in place)
+- **WASD**: Move and strafe (W+D = diagonal, etc.)
+- **Arrow keys**: Zero-point turn
 - **Esc** or **Ctrl+C**: Stop and exit
 
-Requires `pynput`: `pip install pynput`
+Works over SSH (reads from terminal stdin).
 
 ### Example Codes for MecanumChasis Library
 
