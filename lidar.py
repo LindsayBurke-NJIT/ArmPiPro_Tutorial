@@ -7,7 +7,7 @@ from hokuyolx import HokuyoLX
 
 class Lidar:
     def __init__(self):
-        pass
+        self.laser = HokuyoLX()
 
     def update(self, laser, plot, text):
         timestamp, scan = laser.get_filtered_dist(dmax=10000)
@@ -16,10 +16,13 @@ class Lidar:
         plt.draw()
         plt.pause(.001)
 
+    def get_laser(self):
+        return self.laser
+
     def run(self):
         try:
             plt.ion()
-            laser = HokuyoLX()
+            laser = self.get_laser()
             ax = plt.subplot(111, projection='polar')
             plot = ax.plot([], [], '.')[0]
             text = plt.text(0, 1, '', transform=ax.transAxes)
