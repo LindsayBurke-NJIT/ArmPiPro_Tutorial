@@ -1,5 +1,7 @@
 import sys
 import os
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from hokuyolx import HokuyoLX
 
@@ -23,7 +25,7 @@ class Lidar:
             text = plt.text(0, 1, '', transform=ax.transAxes)
             ax.set_rmax(10000)
             ax.grid(True)
-            plt.show
+            plt.show()
             while plt.get_fignums():
                 self.update(laser, plot, text)
             laser.close()

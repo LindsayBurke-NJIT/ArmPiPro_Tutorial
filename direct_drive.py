@@ -57,21 +57,13 @@ class MecanumChassis:
             self.stop_motors()
 
     def drive_xy(self, forward=0, strafe=0, rotation=0, base_speed=60):
-        """Continuous drive with forward, strafe, and rotation components.
-        Call repeatedly (e.g. from a keyboard loop) for responsive control.
-        Args:
-            forward (int): Forward/backward (-100 to 100, positive=forward)
-            strafe (int): Left/right strafe (-100 to 100, positive=right)
-            rotation (int): In-place turn (-100 to 100, positive=clockwise)
-            base_speed (int): Speed multiplier (default 60)
+        """Continuous drive with forward, strafe, and rotation
         """
-        # Mecanum wheel kinematics: [frontLeft, frontRight, backLeft, backRight]
         fl = forward + strafe - rotation
         fr = forward - strafe + rotation
         bl = forward - strafe - rotation
         br = forward + strafe + rotation
         speeds = [fl, fr, bl, br]
-        # Scale down if any motor exceeds max
         max_val = max(abs(s) for s in speeds)
         if max_val > 100:
             scale = 100 / max_val
