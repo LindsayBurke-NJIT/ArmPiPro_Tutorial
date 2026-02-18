@@ -77,9 +77,13 @@ time.sleep(2)
 tsubasa_k.stop_motors()
 ```
 2) Code the robot to travel in the path of a hexagon.
+
 Like the previous problem, the interior angles must be determined so the robot travels in the path of the shape.
+
 The interior angles can be determined by the following formula: [(n-2)*180]/n = interior angle. Then to determine the turn, utilize: 180-interior angle = turn, to get the neccessary turn angles.
+
 For this problem, since there are no constraints on the specified dimensions, a typical hexagon can be assumed, so it would have an interior angle of 120 utilizing the formula (or from memory).
+
 Then subtract it from 180, which results in the angles needed. From there, start from 30 degrees and increment by 60 degrees to acchieve the desired path. Then implement it in the code.
 
 ```
