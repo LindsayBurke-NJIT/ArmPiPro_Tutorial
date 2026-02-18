@@ -1,3 +1,5 @@
+import math
+import time
 import numpy as np
 from scipy.spatial import cKDTree
 import logging
@@ -164,6 +166,40 @@ def icp_2d(source: np.ndarray, target: np.ndarray, max_iter: int = 20, tol: floa
     except Exception as e:
         logger.error(f"Error in icp_2d: {e}")
         raise RuntimeError(f"ICP alignment failed: {e}") from e
+
+def _bresenham(x0: int, y0: int, x1: int, y1: int):
+    """Yield grid cells along line from (x0,y0) to (x1,y1)."""
+    try:
+        x0, y0, x1, y1 = int(x0), int(y0), int(x1), int(y1)
+        
+        max_iter = 10000
+        iter_count = 0
+        
+        dx = abs(x1 - x0)
+        dy = -abs(y1 - y0)
+        sx = 1 if x0 < x1 else -1
+        sy = 1 if y0 < y1 else -1
+        err = dx + dy
+        x, y = x0, y0
+        
+        while iter_count < max_iter:
+            yield (x, y)
+            if x == x1 and y == y1:
+                break
+            e2 = 2 * err
+            if e2 >= dy:
+                err += dy
+                x += sx
+            if e2 <= dx:
+                err += dx
+                y += sy
+            iter_count += 1
+        
+        if iter_count >= max_iter:
+            logger.warning(f"Bresenham exceeded max iterations: ({x0},{y0}) -> ({x1},{y1})")
+    except Exception as e:
+        logger.error(f"Error in Bresenham line: {e}")
+        yield (x0, y0)
 
 class SLAM:
     def __init__(
@@ -495,36 +531,206 @@ class SLAM:
             logger.error(f"Error getting probability map: {e}")
             return np.full_like(self.grid, 0.5, dtype=float)
 
-def _bresenham(x0: int, y0: int, x1: int, y1: int):
-    """Yield grid cells along line from (x0,y0) to (x1,y1)."""
-    try:
-        x0, y0, x1, y1 = int(x0), int(y0), int(x1), int(y1)
-        
-        max_iter = 10000
-        iter_count = 0
-        
-        dx = abs(x1 - x0)
-        dy = -abs(y1 - y0)
-        sx = 1 if x0 < x1 else -1
-        sy = 1 if y0 < y1 else -1
-        err = dx + dy
-        x, y = x0, y0
-        
-        while iter_count < max_iter:
-            yield (x, y)
-            if x == x1 and y == y1:
+    def get_obstacle_distances(self, laser, safe_distance_mm=500):
+        """
+        Get obstacle distances in different directions from lidar scan.
+        Uses same coordinate system as SLAM: x forward, y left, angle 0 = forward.
+        Returns a dictionary with distances in front, left, right, and back.
+        safe_distance_mm: minimum safe distance in millimeters
+        """
+        try:
+            timestamp, scan = laser.get_filtered_dist(dmax=10000)
+            if scan is None or scan.size == 0:
+                return None
+
+            if scan.ndim != 2 or scan.shape[1] < 2:
+                return None
+
+            angles = scan[:, 0]  #in radians (0 = forward, pi/2 = left)
+            ranges = scan[:, 1]  #in millimeters
+
+            angles = np.arctan2(np.sin(angles), np.cos(angles))
+
+            # Define sectors in robot frame (x forward, y left):
+            # Front: -π/4 to π/4 (45 degrees around forward)
+            # Left: π/4 to 3π/4 (90 degrees to the left)
+            # Back: 3π/4 to -3π/4 (45 degrees behind)
+            # Right: -3π/4 to -π/4 (90 degrees to the right)
+
+            front_mask = (angles >= -np.pi/4) & (angles <= np.pi/4)
+            left_mask = (angles >= np.pi/4) & (angles <= 3*np.pi/4)
+            back_mask = (angles >= 3*np.pi/4) | (angles <= -3*np.pi/4)
+            right_mask = (angles >= -3*np.pi/4) & (angles <= -np.pi/4)
+
+            front_dist = np.min(ranges[front_mask]) if np.any(front_mask) else 10000
+            left_dist = np.min(ranges[left_mask]) if np.any(left_mask) else 10000
+            back_dist = np.min(ranges[back_mask]) if np.any(back_mask) else 10000
+            right_dist = np.min(ranges[right_mask]) if np.any(right_mask) else 10000
+
+            return {
+                'front': front_dist,
+                'right': right_dist,
+                'left': left_dist,
+                'back': back_dist,
+                'min_distance': np.min(ranges),
+                'has_obstacle_front': front_dist < safe_distance_mm,
+                'has_obstacle_right': right_dist < safe_distance_mm,
+                'has_obstacle_left': left_dist < safe_distance_mm,
+                'has_obstacle_back': back_dist < safe_distance_mm
+            }
+        except Exception as e:
+            logger.error(f"Error getting obstacle distances: {e}")
+            return None
+
+    def find_safe_direction(self, obstacle_info, preferred_angle_deg=0):
+        """
+        Find a safe direction to move based on obstacle information.
+        preferred_angle_deg: preferred direction in degrees (0=forward, 90=left, -90=right, 180=back)
+        Returns: (forward, strafe, rotation) values for drive_xy
+        """
+        if obstacle_info is None:
+            return (30, 0, 0) #go forward slowly
+
+        safe_distance = 500  #mm
+
+        preferred_angle_deg = ((preferred_angle_deg + 180) % 360) - 180
+
+        preferred_rad = math.radians(preferred_angle_deg)
+        preferred_forward = math.cos(preferred_rad)
+        preferred_strafe = -math.sin(preferred_rad)
+
+        if abs(preferred_angle_deg) <= 45:  #forward sector
+            if not obstacle_info['has_obstacle_front']:
+                speed = 50
+                return (int(preferred_forward * speed), int(preferred_strafe * speed), 0)
+        elif preferred_angle_deg > 45 and preferred_angle_deg <= 135:  #left sector
+            if not obstacle_info['has_obstacle_left']:
+                speed = 50
+                return (int(preferred_forward * speed), int(preferred_strafe * speed), 0)
+        elif preferred_angle_deg < -45 and preferred_angle_deg >= -135:  #right sector
+            if not obstacle_info['has_obstacle_right']:
+                speed = 50
+                return (int(preferred_forward * speed), int(preferred_strafe * speed), 0)
+        else:  #back sector
+            if not obstacle_info['has_obstacle_back']:
+                speed = 30
+                return (int(preferred_forward * speed), int(preferred_strafe * speed), 0)
+
+        #if preferred direction is blocked, find alternative
+        if not obstacle_info['has_obstacle_front']:
+            return (40, 0, 0)
+        elif not obstacle_info['has_obstacle_right']:
+            return (0, 40, 0)
+        elif not obstacle_info['has_obstacle_left']:
+            return (0, -40, 0)
+        elif not obstacle_info['has_obstacle_back']:
+            return (-30, 0, 0)
+        else:
+            #if all directions blocked, rotate
+            return (0, 0, 30)
+
+    def explore_waypoints(self, chassis, laser, waypoints=None, max_iterations=1000):
+        """
+        Explore environment by moving to different waypoints with obstacle avoidance.
+        waypoints: list of (x, y) tuples in meters (relative to start)
+        """
+        if waypoints is None:
+            #Default exploration pattern (moves in square pattern)
+            waypoints = [
+                (1.0, 0.0),   # Forward 1m
+                (1.0, 1.0),   # Forward and right
+                (0.0, 1.0),   # Right
+                (0.0, 0.0),   # Back to start
+                (-1.0, 0.0),  # Backward
+                (-1.0, -1.0), # Backward and left
+                (0.0, -1.0),  # Left
+                (0.0, 0.0),   # Back to start
+            ]
+
+        current_waypoint_idx = 0
+        waypoint_reached_threshold = 0.3  #meters
+        scan_interval = 5  #num of iterations between Lidar scan updates
+        movement_duration = 0.2  #secs per movement step
+
+        logger.info(f"Starting exploration with {len(waypoints)} waypoints")
+
+        iteration = 0
+        success_count = 0
+
+        while iteration < max_iterations:
+            try:
+                x, y, theta = self.get_pose()
+                obstacle_info = self.get_obstacle_distances(laser, safe_distance_mm=500)
+
+                #check if at current waypoint
+                if current_waypoint_idx < len(waypoints):
+                    target_x, target_y = waypoints[current_waypoint_idx]
+                    dx = target_x - x
+                    dy = target_y - y
+                    distance_to_waypoint = math.sqrt(dx*dx + dy*dy)
+
+                    if distance_to_waypoint < waypoint_reached_threshold:
+                        logger.info(f"Reached waypoint {current_waypoint_idx}: ({target_x:.2f}, {target_y:.2f})")
+                        current_waypoint_idx += 1
+                        if current_waypoint_idx >= len(waypoints):
+                            logger.info("All waypoints reached! Continuing exploration...")
+                            current_waypoint_idx = 0
+                        time.sleep(0.5)
+                        continue
+
+                    world_angle = math.atan2(dy, dx)
+                    robot_angle_rad = world_angle - theta
+                    robot_angle_rad = math.atan2(math.sin(robot_angle_rad), math.cos(robot_angle_rad))
+                    robot_angle = math.degrees(robot_angle_rad)
+
+                    angle_error_deg = robot_angle
+                    if abs(angle_error_deg) > 15:
+                        rotation_adjustment = max(-30, min(30, angle_error_deg * 0.5))
+                    else:
+                        rotation_adjustment = 0
+                else:
+                    robot_angle = 0
+                    rotation_adjustment = 0
+
+                forward, strafe, rotation = self.find_safe_direction(obstacle_info, preferred_angle_deg=robot_angle)
+                rotation += rotation_adjustment #realign to reach next waypoint
+                rotation = max(-50, min(50, rotation))
+
+                if obstacle_info and obstacle_info['min_distance'] < 300:
+                    logger.warning(f"Obstacle too close ({obstacle_info['min_distance']:.0f}mm), rotating away...")
+                    forward = 0
+                    strafe = 0
+                    if obstacle_info['right'] > obstacle_info['left']:
+                        rotation = 40  #rotate right
+                    else:
+                        rotation = -40  #rotate left
+
+                chassis.drive_xy(forward=forward, strafe=strafe, rotation=rotation)
+                time.sleep(movement_duration)
+                chassis.stop_motors()
+
+                #Update SLAM
+                if iteration % scan_interval == 0:
+                    if self.step(laser):
+                        success_count += 1
+                        if iteration % 50 == 0:
+                            logger.info(f"Iteration {iteration}: pose x={x:.2f} y={y:.2f} theta={math.degrees(theta):.1f}°")
+                            if obstacle_info:
+                                logger.info(
+                                    f"  Obstacles - Front: {obstacle_info['front']:.0f}mm, "
+                                    f"Right: {obstacle_info['right']:.0f}mm, "
+                                    f"Left: {obstacle_info['left']:.0f}mm"
+                                )
+                iteration += 1
+                time.sleep(0.05)
+
+            except KeyboardInterrupt:
+                logger.info("Exploration interrupted by user")
                 break
-            e2 = 2 * err
-            if e2 >= dy:
-                err += dy
-                x += sx
-            if e2 <= dx:
-                err += dx
-                y += sy
-            iter_count += 1
-        
-        if iter_count >= max_iter:
-            logger.warning(f"Bresenham exceeded max iterations: ({x0},{y0}) -> ({x1},{y1})")
-    except Exception as e:
-        logger.error(f"Error in Bresenham line: {e}")
-        yield (x0, y0)
+            except Exception as e:
+                logger.error(f"Error during exploration iteration {iteration}: {e}")
+                time.sleep(0.1)
+                continue
+
+        logger.info(f"Exploration completed: {success_count} SLAM updates successful")
+        return success_count

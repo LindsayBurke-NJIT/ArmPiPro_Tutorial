@@ -1,5 +1,8 @@
 import os
 import sys
+import time
+import numpy as np
+import math
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from direct_drive import MecanumChassis
@@ -25,33 +28,27 @@ def main():
                 print("Error: Failed to get laser instance")
                 return
             
-            print("Starting SLAM...")
-            success_count = 0
-            for i in range(200):
-                try:
-                    if slam.step(laser):
-                        success_count += 1
-                        x, y, t = slam.get_pose()
-                        if i % 10 == 0:
-                            print(f"Scan {i}: pose x={x:.2f} y={y:.2f} theta={t:.3f}")
-                    else:
-                        print(f"Warning: Scan {i} processing failed")
-                except RuntimeError as e:
-                    print(f"SLAM error at iteration {i}: {e}")
-                    continue
-                except KeyboardInterrupt:
-                    print("\nInterrupted by user")
-                    break
-                except Exception as e:
-                    print(f"Unexpected error at iteration {i}: {e}")
-                    continue
+            print("Starting SLAM with autonomous exploration...")
+            print("The robot will explore different parts of the environment")
+            print("with obstacle avoidance using lidar data.")
+            print("Press Ctrl+C to stop.\n")
             
-            print(f"\nSLAM completed: {success_count}/{i+1} scans processed successfully")
+            # Run exploration with obstacle avoidance
+            success_count = slam.explore_waypoints(
+                chassis,
+                laser,
+                waypoints=None,  # Use default square pattern
+                max_iterations=1000
+            )
+            
+            print(f"\nSLAM completed: {success_count} scans processed successfully")
             
             if slam is not None:
                 try:
                     map_prob = slam.get_map_prob()
                     print(f"Map generated: shape={map_prob.shape}")
+                    x, y, theta = slam.get_pose()
+                    print(f"Final pose: x={x:.2f}m y={y:.2f}m theta={math.degrees(theta):.1f}°")
                 except Exception as e:
                     print(f"Error getting map: {e}")
         except RuntimeError as e:
