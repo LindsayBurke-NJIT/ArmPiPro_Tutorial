@@ -11,11 +11,11 @@ The current libraries created are MecanumChasis and Lidar.
 ## MecanumChasis Library
 
 The MecanumChasis Library focuses on the motor drive control of the Arm Pi Pro robot. Below lists the functions in the library and how to utilize them. 
-The special thing about the Arm Pi Pro is that it utilizes mecanum wheels, meaning that the robot can strafe. 
+A key feature of the Arm Pi Pro is that it utilizes mecanum wheels, meaning that the robot can strafe. 
 Strafing means the robot keeps the same oreintation while being able to move in different directions. 
 This makes it perfect for applications where tight turns cannot easily be made, such as in warehouses.
 
-A key note about mecanum wheels is that you want to make sure they operate in a smooth enivronment as the design of the wheels can easily get jammed due to debris.
+A key note about mecanum wheels is to make sure they operate in a smooth enivronment as the design of the wheels can easily get jammed due to debris.
 Below are the functions provided in the library. Proper manipulation of the arguments/parameters in the functions are necessary to acchieve specific robot movements.
 
 ```
@@ -46,9 +46,85 @@ Run `python keyboard_control.py` to drive the robot with:
 
 Requires `pynput`: `pip install pynput`
 
-### Example Codes for MecanumChasis Library
+### Example Problem Codes for MecanumChasis Library
+
+1) Make the robot travel in the shape of a diamond.
+
+To solve this problem, you first need to determine the turning (strafe) angles required to form the desired shape. Since the problem does not specify constraints such as side lengths or exact dimensions, the key requirement is that the total exterior turning angle must equal 360° in order for the robot (or path) to return to its starting orientation and complete a closed shape.
+
+Note that 360° is not the sum of the interior angles for most polygons. Instead, 360° is the sum of the exterior angles of any closed polygon, taken one at each vertex.
+
+For this case, we can choose two turning angles: 30° and 150°. These add up to 180°. By repeating this pair twice (30° + 150° + 30° + 150°), the total turning becomes 360°, ensuring the path closes properly.
+
+Once the turning angles are determined, the rest is straightforward implementation: define the appropriate movement and turning functions in the code, then sequence them in the required order to generate the desired shape.
+```
+# Always remember to import the proper libraries 
+from direct_drive import MecanumChassis
+import time
+
+# Create chassis object, note you can name the object as anything you want, but make it meaningful.
+tsubasa_k = MecanumChassis()
+
+# For most shapes, they are mostly symmetrical.
+# This means you can mirror your code so you can have one set moving forward and the other moving backward.
+tsubasa_k.drive(60, 30, 2)
+tsubasa_k.drive(60, 150, 2)
+tsubasa_k.drive(-60, 30, 2)
+tsubasa_k.drive(-60, 150, 2)
+
+time.sleep(2)
+
+tsubasa_k.stop_motors()
+```
+2) Code the robot to travel in the path of a hexagon.
+Like the previous problem, the interior angles must be determined so the robot travels in the path of the shape.
+The interior angles can be determined by the following formula: [(n-2)*180]/n = interior angle. Then to determine the turn, utilize: 180-interior angle = turn, to get the neccessary turn angles.
+For this problem, since there are no constraints on the specified dimensions, a typical hexagon can be assumed, so it would have an interior angle of 120 utilizing the formula (or from memory).
+Then subtract it from 180, which results in the angles needed. From there, start from 30 degrees and increment by 60 degrees to acchieve the desired path. Then implement it in the code.
+
+```
+# Always remember to import the proper libraries 
+from direct_drive import MecanumChassis
+import time
+
+# Create chassis object
+tsubasa_k = MecanumChassis()
+
+# Lists can be utilize here to condense the code so you don't have to repeatedly copy & paste the function.
+# Hexagon angles (60° apart)
+angles = [30, 90, 150, 210, 270, 330]
+
+for angle in angles:
+    tsubasa_k.drive(60, angle, 2)
+
+time.sleep(1)
+
+tsubasa_k.stop_motors()
+```
+
+### General Method for Solving Path Problems
+
+From the practice examples, it is clear that most of these path planning problems relate to application of geometric properties, primarily angles. A step-by-step guide is provided below.
+
+Method:
+
+1) Analyze the Geometry. Identify the shape of the path and note any geometric properties such as symmetry or equal sides.
+
+2) Determine Travel Angles. Figure out the angles or directions the robot needs to move or turn at each segment.
+
+3) Use the Shape as a Guide. Refer to the geometry of the shape to plan rotations, strafing, or directional changes.
+
+4) Test and Calibrate. Experiment with different speeds and time durations to achieve the desired movement path.
+
+5) Apply Kinematic Relationships (if given dimensions). When specific distances or dimensions are provided, use basic displacement and motion formulas to calculate timing or distance traveled.
+
 
 ### Recommended Practice Problems for MecanumChasis Library
+
+1) Code the robot to move in the path of a circle. (hint, you'll need to utilize integration)
+2) Code the robot to move in the path of a square.
+3) Code the robot to move in the path of an “X”. 
+
 
 ## Lidar Library
 
