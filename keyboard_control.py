@@ -1,13 +1,5 @@
 #!/usr/bin/python3
 # coding=utf8
-"""
-Keyboard teleop for the Arm Pi Pro robot.
-Works over SSH - reads from terminal stdin (no pynput needed).
-
-- WASD: Drive and strafe (W=forward, A=left, S=back, D=right)
-- Q/E: Zero-point turn (Q=left, E=right)
-- Press Ctrl+C or Escape to stop and exit
-"""
 import sys
 import time
 import select
@@ -15,11 +7,13 @@ import tty
 import termios
 
 from direct_drive import MecanumChassis
-
+#######################################################
+#Params
 DRIVE_SPEED = 60
 TURN_SPEED = 50
 KEY_TIMEOUT = 0.15  # Consider key "released" if not seen for this long (terminal repeats when held)
 
+#######################################################
 
 def main():
     if not sys.stdin.isatty():

@@ -3,9 +3,10 @@
 import time
 import smbus2
 import math
-
-# Motor controller I2C address
-ENCODER_MOTOR_MODULE_ADDRESS = 0x34
+####################################################
+#Params
+ENCODER_MOTOR_MODULE_ADDRESS = 0x34 #motor controller I2C address (default is 0x34)
+####################################################
 
 class MecanumChassis:
     def __init__(self, i2c_port=1):
@@ -44,8 +45,6 @@ class MecanumChassis:
         if not -100 <= speed <= 100:
             raise ValueError("Speed must be between -100 and 100")
 
-        # For mecanum wheels moving forward:
-        # All motors move in same direction
         speeds = [speed] * 4
         
         try:
