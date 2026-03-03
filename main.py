@@ -33,12 +33,12 @@ def main():
             print("with obstacle avoidance using lidar data.")
             print("Press Ctrl+C to stop.\n")
             
-            # Run exploration with obstacle avoidance
+            #Run exploration with obstacle avoidance
             success_count = slam.explore_waypoints(
                 chassis,
                 laser,
-                waypoints=None,  # Use default square pattern
-                max_iterations=1000
+                waypoints=None,
+                max_iterations=5000
             )
             
             print(f"\nSLAM completed: {success_count} scans processed successfully")
