@@ -1,8 +1,11 @@
 import math
 import time
+import os
 import numpy as np
 from scipy.spatial import cKDTree
 import logging
+import matplotlib
+import matplotlib.pyplot as plt
 ####################################################
 logger = logging.getLogger(__name__)
 
@@ -530,6 +533,79 @@ class SLAM:
         except Exception as e:
             logger.error(f"Error getting probability map: {e}")
             return np.full_like(self.grid, 0.5, dtype=float)
+
+    def save_map_visualization(
+        self,
+        out_dir: str = "maps",
+        filename_prefix: str = "lidar_map",
+        map_prob: np.ndarray | None = None,
+        pose: tuple[float, float, float] | None = None,
+        save_npy: bool = True,
+    ) -> str:
+        """
+        Save the occupancy probability map as a PNG in the current output directory.
+        """
+        try:
+            if map_prob is None:
+                map_prob = self.get_map_prob()
+            if pose is None:
+                pose = self.get_pose()
+
+            map_prob = np.asarray(map_prob, dtype=float)
+            if map_prob.ndim != 2:
+                raise ValueError(f"map_prob must be 2D (H,W), got shape {map_prob.shape}")
+
+            os.makedirs(out_dir, exist_ok=True)
+            ts = time.strftime("%Y%m%d_%H%M%S")
+            base = f"{filename_prefix}_{ts}"
+            png_path = os.path.join(out_dir, f"{base}.png")
+
+            if save_npy:
+                npy_path = os.path.join(out_dir, f"{base}.npy")
+                np.save(npy_path, map_prob)
+
+            matplotlib.use("Agg", force=True)
+
+            #occupied (p~1)->dark; free (p~0)->light; unknown around mid-gray
+            img = 1.0 - np.clip(map_prob, 0.0, 1.0)
+
+            fig = plt.figure(figsize=(8, 8), dpi=150)
+            ax = fig.add_subplot(111)
+            ax.imshow(img, cmap="gray", origin="lower", interpolation="nearest")
+            ax.set_title(base)
+            ax.set_xlabel("grid x")
+            ax.set_ylabel("grid y")
+
+            try:
+                x, y, theta = pose
+                ij = self.world_to_cell(np.array([[x, y]], dtype=float))[0]
+                j, i = int(ij[0]), int(ij[1])
+                ax.plot([j], [i], "r.", markersize=6)
+
+                arrow_len_cells = 10.0
+                dx = arrow_len_cells * float(np.cos(theta))
+                dy = arrow_len_cells * float(np.sin(theta))
+                ax.arrow(
+                    j,
+                    i,
+                    dx,
+                    dy,
+                    color="red",
+                    width=0.5,
+                    head_width=3.0,
+                    length_includes_head=True,
+                )
+            except Exception:
+                pass
+
+            fig.tight_layout()
+            fig.savefig(png_path)
+            plt.close(fig)
+
+            return png_path
+        except Exception as e:
+            logger.error(f"Failed to save map visualization: {e}")
+            raise
 
     def get_obstacle_distances(self, laser, safe_distance_mm=500):
         """

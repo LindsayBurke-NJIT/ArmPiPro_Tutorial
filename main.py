@@ -49,6 +49,18 @@ def main():
                     print(f"Map generated: shape={map_prob.shape}")
                     x, y, theta = slam.get_pose()
                     print(f"Final pose: x={x:.2f}m y={y:.2f}m theta={math.degrees(theta):.1f}°")
+
+                    try:
+                        out_path = slam.save_map_visualization(
+                            out_dir="maps",
+                            filename_prefix="lidar_map",
+                            map_prob=map_prob,
+                            pose=(x, y, theta),
+                            save_npy=True,
+                        )
+                        print(f"Saved map visualization to: {out_path}")
+                    except Exception as e:
+                        print(f"Error saving map visualization: {e}")
                 except Exception as e:
                     print(f"Error getting map: {e}")
         except RuntimeError as e:

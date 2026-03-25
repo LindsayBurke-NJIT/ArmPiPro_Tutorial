@@ -11,7 +11,7 @@ from direct_drive import MecanumChassis
 #Params
 DRIVE_SPEED = 60
 TURN_SPEED = 50
-KEY_TIMEOUT = 0.15  # Consider key "released" if not seen for this long (terminal repeats when held)
+KEY_TIMEOUT = 0.15  #consider key "released" if not seen for this long (terminal repeats when held)
 
 #######################################################
 
@@ -23,7 +23,6 @@ def main():
 
     chassis = MecanumChassis()
 
-    # Keys we care about -> last time seen (terminal sends repeats when held)
     last_seen = {}
 
     fd = sys.stdin.fileno()
@@ -33,23 +32,22 @@ def main():
         return (time.time() - last_seen.get(key_id, 0)) < KEY_TIMEOUT
 
     def update_motors():
-        # Robot chassis mapping: forward+ -> left, forward- -> right, strafe+ -> forward, strafe- -> back
         forward = 0
         strafe = 0
         rotation = 0
 
         if is_pressed('w'):
-            strafe += DRIVE_SPEED   # forward
+            strafe += DRIVE_SPEED   #forward
         if is_pressed('s'):
-            strafe -= DRIVE_SPEED   # backward
+            strafe -= DRIVE_SPEED   #backward
         if is_pressed('a'):
-            forward += DRIVE_SPEED  # left
+            forward += DRIVE_SPEED  #left
         if is_pressed('d'):
-            forward -= DRIVE_SPEED  # right
+            forward -= DRIVE_SPEED  #right
         if is_pressed('q'):
-            rotation -= TURN_SPEED  # turn left
+            rotation -= TURN_SPEED  #turn left
         if is_pressed('e'):
-            rotation += TURN_SPEED  # turn right
+            rotation += TURN_SPEED  #turn right
 
         chassis.drive_xy(forward=forward, strafe=strafe, rotation=rotation)
 
@@ -59,14 +57,13 @@ def main():
             return None
         ch = sys.stdin.read(1)
         if ch == '\x1b':
-            # Arrow keys send \x1b[A etc - consume and ignore (we use Q/E for turn)
             if select.select([sys.stdin], [], [], 0.05)[0]:
-                sys.stdin.read(2)  # consume [A, [B, etc.
-                return None  # Ignore arrow keys
-            return ch  # Plain Escape = quit
+                sys.stdin.read(2)
+                return None
+            return ch
         return ch.lower() if ch.isalpha() else ch
 
-    print("Keyboard control active (terminal/SSH mode).")
+    print("Keyboard control active.")
     print("  WASD = drive/strafe (W=forward, A=left, S=back, D=right)")
     print("  Q/E = zero-point turn")
     print("  Esc or Ctrl+C = quit")
@@ -78,7 +75,7 @@ def main():
         while running:
             key = read_key()
             if key is not None:
-                if key == '\x03' or key == '\x1b':  # Ctrl+C or plain Escape
+                if key == '\x03' or key == '\x1b':
                     running = False
                     continue
                 last_seen[key] = time.time()
@@ -91,7 +88,6 @@ def main():
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         chassis.stop_motors()
         print("\nMotors stopped.")
-
 
 if __name__ == "__main__":
     main()
