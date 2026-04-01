@@ -149,7 +149,7 @@ The main motivation for implementing a LiDAR is for SLAM (Simultaneous Localizat
 This allows the robot to create a 3D map using the LiDAR data and localize itself on the map at the same time. 
 Essentially, the LiDAR serves as the robot's eyes, enabling it to navigate through various terrains by using data about its surroundings.
 
-# Sampling Method
+### Sampling Method
 
 Using the LiDAR, the robot moves in a square path to collect data points in its environment space. There is built-in object avoidance, so if an object is too close, the robot would move to the right or left depending on the object position. 
 The efficiency of the robot's autonomous performance depends on how long it is in sampling operation. Additionally you can set way point at different points around the environment if you know the dimension you wish to acchieve with the sampling.
