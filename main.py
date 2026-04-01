@@ -5,12 +5,15 @@ import numpy as np
 import math
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from config import Config
 from direct_drive import MecanumChassis
 from lidar import Lidar
 from slam import SLAM
 #######################################################
 
 def main():
+    cfg = Config()
+
     chassis = None
     lidar = None
     slam = None
@@ -21,7 +24,7 @@ def main():
         lidar = Lidar()
 
         try:
-            slam = SLAM(resolution=0.05)
+            slam = SLAM(resolution=cfg.slam_resolution)
             laser = lidar.get_laser()
             
             if laser is None:
@@ -29,17 +32,11 @@ def main():
                 return
             
             print("Starting SLAM with autonomous exploration...")
-            print("The robot will explore different parts of the environment")
-            print("with obstacle avoidance using lidar data.")
+            print(f"Mode: {cfg.exploration_mode}")
+            print("The robot will explore with obstacle avoidance using lidar data.")
             print("Press Ctrl+C to stop.\n")
-            
-            #Run exploration with obstacle avoidance
-            success_count = slam.explore_waypoints(
-                chassis,
-                laser,
-                waypoints=None,
-                max_iterations=5000
-            )
+
+            success_count = slam.explore_waypoints(chassis, laser, cfg)
             
             print(f"\nSLAM completed: {success_count} scans processed successfully")
             
@@ -52,11 +49,11 @@ def main():
 
                     try:
                         out_path = slam.save_map_visualization(
-                            out_dir="maps",
-                            filename_prefix="lidar_map",
+                            out_dir=cfg.map_out_dir,
+                            filename_prefix=cfg.map_filename_prefix,
                             map_prob=map_prob,
                             pose=(x, y, theta),
-                            save_npy=True,
+                            save_npy=cfg.save_map_npy,
                         )
                         print(f"Saved map visualization to: {out_path}")
                     except Exception as e:

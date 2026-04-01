@@ -1,11 +1,15 @@
 import math
 import time
 import os
+import random
 import numpy as np
 from scipy.spatial import cKDTree
 import logging
 import matplotlib
 import matplotlib.pyplot as plt
+
+from config import Config
+
 ####################################################
 logger = logging.getLogger(__name__)
 
@@ -705,30 +709,77 @@ class SLAM:
             #if all directions blocked, rotate
             return (0, 0, 30)
 
-    def explore_waypoints(self, chassis, laser, waypoints=None, max_iterations=1000):
+    def explore_free_environment(self, laser) -> float:
         """
-        Explore environment by moving to different waypoints with obstacle avoidance.
-        waypoints: list of (x, y) tuples in meters (relative to start)
+        Preferred heading (deg, robot frame; same convention as find_safe_direction:
+        0=forward, 90=left). Mixes random wandering with biasing toward the
+        longest clear ray in the current scan.
         """
-        if waypoints is None:
-            #Default exploration pattern (moves in square pattern)
-            waypoints = [
-                (1.0, 0.0),   # Forward 1m
-                (1.0, 1.0),   # Forward and right
-                (0.0, 1.0),   # Right
-                (0.0, 0.0),   # Back to start
-                (-1.0, 0.0),  # Backward
-                (-1.0, -1.0), # Backward and left
-                (0.0, -1.0),  # Left
-                (0.0, 0.0),   # Back to start
-            ]
+        try:
+            if random.random() < 0.35:
+                return float(random.uniform(-180.0, 180.0))
+
+            _, scan = laser.get_filtered_dist(dmax=10000)
+            if scan is None or scan.size == 0:
+                return float(random.uniform(-180.0, 180.0))
+
+            scan = np.asarray(scan)
+            if scan.ndim != 2 or scan.shape[1] < 2:
+                return float(random.uniform(-180.0, 180.0))
+
+            angles = scan[:, 0]
+            ranges = scan[:, 1]
+            valid = (ranges > 0) & np.isfinite(ranges) & np.isfinite(angles)
+            if not np.any(valid):
+                return float(random.uniform(-180.0, 180.0))
+
+            angles_v = angles[valid]
+            ranges_v = ranges[valid]
+            k = int(np.argmax(ranges_v))
+            ang_deg = math.degrees(float(angles_v[k]))
+            return float(((ang_deg + 180.0) % 360.0) - 180.0)
+        except Exception:
+            return float(random.uniform(-180.0, 180.0))
+
+    def explore_waypoints(self, chassis, laser, config: Config):
+        """
+        Explore with obstacle avoidance and periodic SLAM updates.
+
+        exploration_mode (on config):
+          - 'waypoints': follow config.waypoints (set in config.py).
+          - 'free': ignore config.waypoints; wander via explore_free_environment + avoidance.
+        """
+        exploration_mode = config.exploration_mode
+        max_iterations = config.max_iterations
+        free_heading_reseed_interval = config.free_heading_reseed_interval
+        waypoints = config.waypoints
+
+        mode = (exploration_mode or "waypoints").strip().lower()
+        if mode not in ("waypoints", "free"):
+            raise ValueError(
+                f"exploration_mode must be 'waypoints' or 'free', got {exploration_mode!r}"
+            )
+
+        use_waypoints = mode == "waypoints"
 
         current_waypoint_idx = 0
         waypoint_reached_threshold = 0.3  #meters
         scan_interval = 5  #num of iterations between Lidar scan updates
         movement_duration = 0.2  #secs per movement step
 
-        logger.info(f"Starting exploration with {len(waypoints)} waypoints")
+        if use_waypoints:
+            waypoints = list(waypoints)
+            if not waypoints:
+                raise ValueError("config.waypoints must be non-empty when exploration_mode is 'waypoints'")
+            logger.info(f"Exploration mode=waypoints, {len(waypoints)} waypoints")
+        else:
+            logger.info("Exploration mode=free: ignoring config.waypoints")
+            waypoints = []
+            free_heading_reseed_interval = max(1, int(free_heading_reseed_interval))
+            free_preferred_angle = 0.0
+            logger.info(
+                f"Exploration mode=free (reseed heading every {free_heading_reseed_interval} iterations)"
+            )
 
         iteration = 0
         success_count = 0
@@ -738,38 +789,52 @@ class SLAM:
                 x, y, theta = self.get_pose()
                 obstacle_info = self.get_obstacle_distances(laser, safe_distance_mm=500)
 
-                #check if at current waypoint
-                if current_waypoint_idx < len(waypoints):
-                    target_x, target_y = waypoints[current_waypoint_idx]
-                    dx = target_x - x
-                    dy = target_y - y
-                    distance_to_waypoint = math.sqrt(dx*dx + dy*dy)
+                rotation_adjustment = 0.0
 
-                    if distance_to_waypoint < waypoint_reached_threshold:
-                        logger.info(f"Reached waypoint {current_waypoint_idx}: ({target_x:.2f}, {target_y:.2f})")
-                        current_waypoint_idx += 1
-                        if current_waypoint_idx >= len(waypoints):
-                            logger.info("All waypoints reached! Continuing exploration...")
-                            current_waypoint_idx = 0
-                        time.sleep(0.5)
-                        continue
+                if use_waypoints:
+                    if current_waypoint_idx < len(waypoints):
+                        target_x, target_y = waypoints[current_waypoint_idx]
+                        dx = target_x - x
+                        dy = target_y - y
+                        distance_to_waypoint = math.sqrt(dx*dx + dy*dy)
 
-                    world_angle = math.atan2(dy, dx)
-                    robot_angle_rad = world_angle - theta
-                    robot_angle_rad = math.atan2(math.sin(robot_angle_rad), math.cos(robot_angle_rad))
-                    robot_angle = math.degrees(robot_angle_rad)
+                        if distance_to_waypoint < waypoint_reached_threshold:
+                            logger.info(
+                                f"Reached waypoint {current_waypoint_idx}: ({target_x:.2f}, {target_y:.2f})"
+                            )
+                            current_waypoint_idx += 1
+                            if current_waypoint_idx >= len(waypoints):
+                                logger.info("All waypoints reached! Continuing exploration...")
+                                current_waypoint_idx = 0
+                            time.sleep(0.5)
+                            continue
 
-                    angle_error_deg = robot_angle
-                    if abs(angle_error_deg) > 15:
-                        rotation_adjustment = max(-30, min(30, angle_error_deg * 0.5))
+                        world_angle = math.atan2(dy, dx)
+                        robot_angle_rad = world_angle - theta
+                        robot_angle_rad = math.atan2(
+                            math.sin(robot_angle_rad), math.cos(robot_angle_rad)
+                        )
+                        robot_angle = math.degrees(robot_angle_rad)
+
+                        angle_error_deg = robot_angle
+                        if abs(angle_error_deg) > 15:
+                            rotation_adjustment = max(-30, min(30, angle_error_deg * 0.5))
+                        else:
+                            rotation_adjustment = 0
                     else:
-                        rotation_adjustment = 0
+                        robot_angle = 0
                 else:
-                    robot_angle = 0
-                    rotation_adjustment = 0
+                    if iteration % free_heading_reseed_interval == 0:
+                        free_preferred_angle = self.explore_free_environment(laser)
+                        logger.debug(
+                            f"Free explore: new preferred heading {free_preferred_angle:.1f}°"
+                        )
+                    robot_angle = free_preferred_angle
 
-                forward, strafe, rotation = self.find_safe_direction(obstacle_info, preferred_angle_deg=robot_angle)
-                rotation += rotation_adjustment #realign to reach next waypoint
+                forward, strafe, rotation = self.find_safe_direction(
+                    obstacle_info, preferred_angle_deg=robot_angle
+                )
+                rotation += int(round(rotation_adjustment))
                 rotation = max(-50, min(50, rotation))
 
                 if obstacle_info and obstacle_info['min_distance'] < 300:
