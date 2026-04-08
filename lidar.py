@@ -1,9 +1,44 @@
 import sys
-import os
+import subprocess
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from hokuyolx import HokuyoLX
+
+#LiDAR Ethernet on ArmPi (set once here or via persistent netplan/dhcpcd on the robot)
+_LIDAR_IFACE = "end0"
+_LIDAR_CIDR = "192.168.0.15/24" #this is the default for the Hokuyo LX-10 lidar model
+
+def ensure_lidar_network():
+    """On Linux, add the static IP for the Hokuyo if it is not already configured."""
+    if sys.platform != "linux":
+        return
+    try:
+        show = subprocess.run(
+            ["ip", "-4", "addr", "show", "dev", _LIDAR_IFACE],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if show.returncode == 0 and "192.168.0.15" in show.stdout:
+            return
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return
+
+    add = ["ip", "addr", "add", _LIDAR_CIDR, "dev", _LIDAR_IFACE]
+    for cmd in (add, ["sudo", "-n"] + add):
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            if r.returncode == 0:
+                return
+        except FileNotFoundError:
+            continue
+    print(
+        "Warning: could not add LiDAR IP. Run once: "
+        f"sudo ip addr add {_LIDAR_CIDR} dev {_LIDAR_IFACE}\n"
+        "Or allow passwordless sudo for that command, or run this script as root."
+    )
+
 #######################################################
 class Lidar:
     def __init__(self):
@@ -72,6 +107,7 @@ class Lidar:
                 print(f"Error closing laser: {e}")
 
 def main():
+    ensure_lidar_network()
     myLidar = Lidar()
     myLidar.run()
 

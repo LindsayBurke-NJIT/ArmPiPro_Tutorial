@@ -197,7 +197,6 @@ class HokuyoLX(object):
         return status, resp
 
     #Processing and filtering scan data
-
     def get_angles(self, start=None, end=None, grouping=0):
         '''Returns array of angles for given `start`, `end` and `grouping`
         parameters and according to the sensor parameters stored inside object.
@@ -231,7 +230,6 @@ class HokuyoLX(object):
         num = self.amax - self.amin + 1
         space = np.linspace(self.amin, self.amax, num) - self.aforw
         angles = 2*np.pi*space/self.ares
-        # TODO remake grouping
         return angles[start:end+1:grouping]
 
     def _process_scan_data(self, data, with_intensity):
@@ -269,7 +267,6 @@ class HokuyoLX(object):
         return data
 
     #Control of sensor state
-
     def _force_standby(self):
         '''Forces standby state, if it unable to do it throws an exception'''
         state, description = self.laser_state()
