@@ -157,12 +157,17 @@ The quality of the robot's mapping depends on how long it is in sampling operati
 ## Configuration
 The settings are configurable in ```config.py```.
 
-<u>Settings for lidar obstacle avoidance</u>
+<h5>Settings for lidar obstacle avoidance</h5>
+
     lidar_mask_angle_intervals_deg: tuple[tuple[float, float], ...] = () #sets the angle intervals to mask for obstacle avoidance (e.g. range where the arm/chassis of robot
                                                                          is to avoid sensing itself)
+                                                                         
     lidar_forward_cone_half_width_deg: float     #sets the width of the forward cone for obstacle avoidance
+    
     lidar_forward_clearance_percentile: float    #sets the percentile of the forward cone for obstacle avoidance
+    
     lidar_emergency_close_mm: float              #sets the distance at which the robot will stop if it is too close to an obstacle
+    
     lidar_emergency_debounce_scans: int          #sets the number of scans at which the robot will stop if it is too close to an obstacle (to prevent jittering)
 
-An angular mask can be applied to the LiDAR data to prevent the robot from scanning itself. 
+
