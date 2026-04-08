@@ -151,5 +151,18 @@ Essentially, the LiDAR serves as the robot's eyes, enabling it to navigate throu
 
 ### Sampling Method
 
-Using the LiDAR, the robot moves in a square path to collect data points in its environment space. There is built-in object avoidance, so if an object is too close, the robot will move in the direction with the larger distance. 
-The quality of the robot's mapping depends on how long it is in sampling operation. Additionally you can set way point at different points that the roboot much reach around the environment if you know the dimensions of the environment you wish to achieve with the sampling.
+Using the LiDAR, the robot moves in a square path to collect data points in its environment space. Alternatively, you can set way point at different points that the robot much reach around the environment if you know the dimensions of the environment you wish to achieve with the sampling. There is built-in object avoidance, so if an object is too close, the robot will move in the direction with the larger distance. 
+The quality of the robot's mapping depends on how long it is in sampling operation.
+
+## Configuration
+The settings are configurable in ```config.py```.
+
+<u>Settings for lidar obstacle avoidance</u>
+    lidar_mask_angle_intervals_deg: tuple[tuple[float, float], ...] = () #sets the angle intervals to mask for obstacle avoidance (e.g. range where the arm/chassis of robot
+                                                                         is to avoid sensing itself)
+    lidar_forward_cone_half_width_deg: float     #sets the width of the forward cone for obstacle avoidance
+    lidar_forward_clearance_percentile: float    #sets the percentile of the forward cone for obstacle avoidance
+    lidar_emergency_close_mm: float              #sets the distance at which the robot will stop if it is too close to an obstacle
+    lidar_emergency_debounce_scans: int          #sets the number of scans at which the robot will stop if it is too close to an obstacle (to prevent jittering)
+
+An angular mask can be applied to the LiDAR data to prevent the robot from scanning itself. 
