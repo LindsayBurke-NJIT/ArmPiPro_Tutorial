@@ -157,7 +157,7 @@ The quality of the robot's mapping depends on how long it is in sampling operati
 ## Configuration
 The settings are configurable in ```config.py```.
 
-<h5>Settings for lidar obstacle avoidance</h5>
+<h5>Settings for LiDAR obstacle avoidance</h5>
 
     lidar_mask_angle_intervals_deg: tuple[tuple[float, float], ...] = () #sets the angle intervals to mask for obstacle avoidance (e.g. range where the arm/chassis of robot
                                                                          is to avoid sensing itself)
@@ -171,3 +171,24 @@ The settings are configurable in ```config.py```.
     lidar_emergency_debounce_scans: int          #sets the number of scans at which the robot will stop if it is too close to an obstacle (to prevent jittering)
 
 
+<h5>Settings for SLAM navigation</h5>
+
+    exploration_mode: str = "waypoints"
+    
+    max_iterations: int = 5000
+    
+    free_heading_reseed_interval: int = 25
+    
+    waypoints: tuple[tuple[float, float], ...] = (
+        (1.0, 0.0),
+        (1.0, 1.0),
+        ...
+    ) #exploration_mode "free" ignores waypoints at runtime
+    
+    slam_resolution: float = 0.05
+    
+    map_out_dir: str = "maps" #output directory for the map created by SLAM
+    
+    map_filename_prefix: str = "lidar_map" #file name of output map
+    
+    save_map_npy: bool = True
