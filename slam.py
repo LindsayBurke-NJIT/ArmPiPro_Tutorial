@@ -13,6 +13,61 @@ from config import Config
 ####################################################
 logger = logging.getLogger(__name__)
 
+def normalize_angle_deg(deg: float) -> float:
+    return ((float(deg) + 180.0) % 360.0) - 180.0
+
+def angular_diff_deg(a_deg: np.ndarray, b_deg: float) -> np.ndarray:
+    """Smallest absolute difference between each a and b (degrees)."""
+    d = np.asarray(a_deg, dtype=float) - float(b_deg)
+    d = (d + 180.0) % 360.0 - 180.0
+    return np.abs(d)
+
+def mask_beams_angle_intervals_deg(
+    angles_rad: np.ndarray,
+    ranges_mm: np.ndarray,
+    intervals_deg: tuple[tuple[float, float], ...],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Drop beams whose angle (robot frame, deg) falls inside any closed interval."""
+    if not intervals_deg:
+        return angles_rad, ranges_mm
+    a = np.asarray(angles_rad, dtype=float)
+    r = np.asarray(ranges_mm, dtype=float)
+    if a.size == 0:
+        return a, r
+    deg = np.degrees(a)
+    deg = ((deg + 180.0) % 360.0) - 180.0
+    keep = np.ones(deg.shape, dtype=bool)
+    for lo, hi in intervals_deg:
+        lo, hi = float(lo), float(hi)
+        if lo <= hi:
+            in_iv = (deg >= lo) & (deg <= hi)
+        else:
+            in_iv = (deg >= lo) | (deg <= hi)
+        keep &= ~in_iv
+    return a[keep], r[keep]
+
+def forward_cone_percentile_mm(
+    angles_rad: np.ndarray,
+    ranges_mm: np.ndarray,
+    preferred_angle_deg: float,
+    cone_half_width_deg: float,
+    percentile: float,
+) -> float:
+    """Percentile distance (mm) among beams within ±cone_half_width_deg of preferred heading."""
+    if angles_rad.size == 0:
+        return float("inf")
+    pref = normalize_angle_deg(preferred_angle_deg)
+    bd = np.degrees(np.asarray(angles_rad, dtype=float))
+    bd = ((bd + 180.0) % 360.0) - 180.0
+    diff = angular_diff_deg(bd, pref)
+    in_cone = diff <= float(cone_half_width_deg)
+    rr = np.asarray(ranges_mm, dtype=float)[in_cone]
+    rr = rr[np.isfinite(rr) & (rr > 0)]
+    if rr.size == 0:
+        return float("inf")
+    p = float(np.clip(percentile, 0.0, 100.0))
+    return float(np.percentile(rr, p))
+
 def polar_to_cartesian(angles_rad: np.ndarray, ranges_mm: np.ndarray) -> np.ndarray:
     """Convert polar (angle, range) to cartesian (x, y) in robot frame. x forward, y left."""
     try:
@@ -262,6 +317,7 @@ class SLAM:
             self.pose = np.array([0.0, 0.0, 0.0])  #x, y, theta world
             self._prev_points = None  #prev scan in world frame for ICP
             self._map_points = []  #accumulated points for map
+            self._emergency_close_streak = Config.lidar_emergency_debounce_scans #number of consecutive scans at which the robot is too close to an obstacle
             
             logger.info(f"SLAM initialized: grid={nh}x{nw}, resolution={resolution}m")
         except Exception as e:
@@ -611,15 +667,21 @@ class SLAM:
             logger.error(f"Failed to save map visualization: {e}")
             raise
 
-    def get_obstacle_distances(self, laser, safe_distance_mm=500):
+    def get_obstacle_distances(
+        self,
+        laser,
+        config: Config,
+        preferred_angle_deg: float = 0.0,
+        safe_distance_mm: float = 500,
+    ):
         """
         Get obstacle distances in different directions from lidar scan.
         Uses same coordinate system as SLAM: x forward, y left, angle 0 = forward.
-        Returns a dictionary with distances in front, left, right, and back.
-        safe_distance_mm: minimum safe distance in millimeters
+        Beams inside config.lidar_mask_angle_intervals_deg are ignored (self-hit mask).
+        forward_clearance_mm uses a percentile in a cone around preferred_angle_deg.
         """
         try:
-            timestamp, scan = laser.get_filtered_dist(dmax=10000)
+            _, scan = laser.get_filtered_dist(dmax=10000)
             if scan is None or scan.size == 0:
                 return None
 
@@ -630,6 +692,17 @@ class SLAM:
             ranges = scan[:, 1]  #in millimeters
 
             angles = np.arctan2(np.sin(angles), np.cos(angles))
+            valid = np.isfinite(ranges) & np.isfinite(angles) & (ranges > 0)
+            if not np.any(valid):
+                return None
+            angles = angles[valid]
+            ranges = ranges[valid]
+
+            angles, ranges = mask_beams_angle_intervals_deg(
+                angles, ranges, config.lidar_mask_angle_intervals_deg
+            )
+            if angles.size == 0:
+                return None
 
             # Define sectors in robot frame (x forward, y left):
             # Front: -π/4 to π/4 (45 degrees around forward)
@@ -647,16 +720,26 @@ class SLAM:
             back_dist = np.min(ranges[back_mask]) if np.any(back_mask) else 10000
             right_dist = np.min(ranges[right_mask]) if np.any(right_mask) else 10000
 
+            forward_clearance_mm = forward_cone_percentile_mm(
+                angles,
+                ranges,
+                preferred_angle_deg,
+                config.lidar_forward_cone_half_width_deg,
+                config.lidar_forward_clearance_percentile,
+            )
+            masked_min = float(np.min(ranges))
+
             return {
                 'front': front_dist,
                 'right': right_dist,
                 'left': left_dist,
                 'back': back_dist,
-                'min_distance': np.min(ranges),
+                'min_distance': masked_min,
+                'forward_clearance_mm': forward_clearance_mm,
                 'has_obstacle_front': front_dist < safe_distance_mm,
                 'has_obstacle_right': right_dist < safe_distance_mm,
                 'has_obstacle_left': left_dist < safe_distance_mm,
-                'has_obstacle_back': back_dist < safe_distance_mm
+                'has_obstacle_back': back_dist < safe_distance_mm,
             }
         except Exception as e:
             logger.error(f"Error getting obstacle distances: {e}")
@@ -787,9 +870,8 @@ class SLAM:
         while iteration < max_iterations:
             try:
                 x, y, theta = self.get_pose()
-                obstacle_info = self.get_obstacle_distances(laser, safe_distance_mm=500)
-
                 rotation_adjustment = 0.0
+                robot_angle = 0.0
 
                 if use_waypoints:
                     if current_waypoint_idx < len(waypoints):
@@ -822,7 +904,8 @@ class SLAM:
                         else:
                             rotation_adjustment = 0
                     else:
-                        robot_angle = 0
+                        robot_angle = 0.0
+                        rotation_adjustment = 0.0
                 else:
                     if iteration % free_heading_reseed_interval == 0:
                         free_preferred_angle = self.explore_free_environment(laser)
@@ -831,20 +914,46 @@ class SLAM:
                         )
                     robot_angle = free_preferred_angle
 
+                obstacle_info = self.get_obstacle_distances(
+                    laser,
+                    config,
+                    preferred_angle_deg=robot_angle,
+                    safe_distance_mm=Config.lidar_emergency_close_mm,
+                )
+
                 forward, strafe, rotation = self.find_safe_direction(
                     obstacle_info, preferred_angle_deg=robot_angle
                 )
                 rotation += int(round(rotation_adjustment))
                 rotation = max(-50, min(50, rotation))
 
-                if obstacle_info and obstacle_info['min_distance'] < 300:
-                    logger.warning(f"Obstacle too close ({obstacle_info['min_distance']:.0f}mm), rotating away...")
+                emerg_mm = float(config.lidar_emergency_close_mm)
+                fc = (
+                    obstacle_info.get("forward_clearance_mm", float("inf"))
+                    if obstacle_info
+                    else float("inf")
+                )
+
+                if obstacle_info and fc < emerg_mm:
+                    self._emergency_close_streak += 1
+                else:
+                    self._emergency_close_streak = 0
+
+                if (
+                    obstacle_info
+                    and self._emergency_close_streak >= config.lidar_emergency_debounce_scans
+                ):
+                    logger.warning(
+                        f"Obstacle too close (forward clearance {fc:.0f}mm < {emerg_mm:.0f}mm, "
+                        f"after {config.lidar_emergency_debounce_scans} consecutive scans), rotating away..."
+                    )
                     forward = 0
                     strafe = 0
                     if obstacle_info['right'] > obstacle_info['left']:
                         rotation = 40  #rotate right
                     else:
                         rotation = -40  #rotate left
+                    self._emergency_close_streak = 0
 
                 chassis.drive_xy(forward=forward, strafe=strafe, rotation=rotation)
                 time.sleep(movement_duration)
@@ -857,10 +966,12 @@ class SLAM:
                         if iteration % 50 == 0:
                             logger.info(f"Iteration {iteration}: pose x={x:.2f} y={y:.2f} theta={math.degrees(theta):.1f}°")
                             if obstacle_info:
+                                fc = obstacle_info.get("forward_clearance_mm", float("nan"))
                                 logger.info(
                                     f"  Obstacles - Front: {obstacle_info['front']:.0f}mm, "
                                     f"Right: {obstacle_info['right']:.0f}mm, "
-                                    f"Left: {obstacle_info['left']:.0f}mm"
+                                    f"Left: {obstacle_info['left']:.0f}mm, "
+                                    f"Fwd cone p{config.lidar_forward_clearance_percentile:.0f}: {fc:.0f}mm"
                                 )
                 iteration += 1
                 time.sleep(0.05)
