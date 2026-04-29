@@ -1,5 +1,5 @@
 # Additional Resources for ArmPiPro Robot
-For more resources on the specific functionalities of the ArmPiPro robot, including how the mecanum drive works, the wiring schematic, and the logic for the programming (including the original ROS-based program) use the following link: !link[here](https://drive.google.com/drive/folders/1STIYCfLzk3rt_0GHM_-8SaYc4Za9FjiZ?usp=sharing). 
+For more resources on the specific functionalities of the ArmPiPro robot, including how the mecanum drive works, the wiring schematic, and the logic for the programming (including the original ROS-based program) use the following link: [here](https://drive.google.com/drive/folders/1STIYCfLzk3rt_0GHM_-8SaYc4Za9FjiZ?usp=sharing). 
 
 # Introduction
 
