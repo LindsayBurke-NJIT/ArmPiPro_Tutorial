@@ -7,7 +7,7 @@ Contributors: Lindsay Burke, Johnnuel Magno
 
 For use at NJIT's Robotics Class
 
-This git repository features code libraries and tutorials for the Hiwonder Arm Pi Pro. Initially it utilized ROS, but the robot itself isn't robust enough to properly utilize it, so the code was abstracted.
+This git repository features code libraries and tutorials for the Hiwonder Arm Pi Pro. Initially it utilized ROS, but ROS code typically includes a convoluted web of topics and nodes that can have a steep learning curve. So, we decided to create a Python library for ease of learning how to interact with the robot and implement Simultaneous Localization and Mapping (SLAM) for mapping environmments using a LiDAR sensor. 
 
 The current libraries created are MecanumChasis and Lidar. 
 
