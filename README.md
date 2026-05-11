@@ -131,10 +131,7 @@ Method:
 1) Code the robot to move in the path of a circle. (hint, you'll need to utilize integration)
 2) Code the robot to move in the path of a square.
 3) Code the robot to move in the path of an “X”.
-4) Code the robot to follow this path:
-5) Code the robot to follow this path:
-6) Challenge:  Code the robot to follow this path (follow the arrows). Hint: Utilize both strafing and rotation:
-
+4) Code the robot to move in a triangle.
 
 ## Lidar Library
 
